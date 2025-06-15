@@ -1,12 +1,12 @@
 import React from "react";
 import "./sortShelfDialog.css";
-import { driveList } from "../../../constants/driveList";
 import { Trans } from "react-i18next";
 import { SortShelfDialogProps, SortShelfDialogState } from "./interface";
 import _ from "underscore";
 import { ReactSortable } from "react-sortablejs";
 import { ConfigService } from "../../../assets/lib/kookit-extra-browser.min";
 import toast from "react-hot-toast";
+import DeletePopup from "../deletePopup";
 class SortShelfDialog extends React.Component<
   SortShelfDialogProps,
   SortShelfDialogState
@@ -17,7 +17,9 @@ class SortShelfDialog extends React.Component<
     this.state = {
       sortedShelfList: [],
       currentEditShelf: "",
+      currentDeleteShelf: "",
       newShelfName: "",
+      isOpenDelete: false,
     };
   }
   componentDidMount(): void {
@@ -71,7 +73,37 @@ class SortShelfDialog extends React.Component<
     toast.success(this.props.t("Renamed successfully"));
     this.setState({ currentEditShelf: "", newShelfName: "" });
   };
+  handleDeleteShelf = () => {
+    if (!this.state.currentDeleteShelf) return;
+    let currentShelfTitle = this.state.currentDeleteShelf;
+    ConfigService.deleteMapConfig(currentShelfTitle, "shelfList");
+    ConfigService.deleteListConfig(currentShelfTitle, "sortedShelfList");
+
+    this.props.handleShelf("");
+    let sortedShelfList =
+      ConfigService.getAllListConfig("sortedShelfList") || [];
+    let shelfList = ConfigService.getAllMapConfig("shelfList");
+    let shelfTitleList = Object.keys(shelfList);
+    this.setState({
+      sortedShelfList: Array.from(
+        new Set([...sortedShelfList, ...shelfTitleList])
+      ).map((item, index) => {
+        return { name: item, id: index };
+      }),
+    });
+  };
+  handleDeletePopup = (isOpenDelete: boolean) => {
+    this.setState({ isOpenDelete });
+  };
   render() {
+    const deletePopupProps = {
+      mode: "shelf",
+      name: this.state.currentDeleteShelf,
+      title: "Delete this shelf",
+      description: "This action will clear and remove this shelf",
+      handleDeletePopup: this.handleDeletePopup,
+      handleDeleteOpearion: this.handleDeleteShelf,
+    };
     return (
       <div
         className="backup-page-container"
@@ -81,8 +113,9 @@ class SortShelfDialog extends React.Component<
           event.stopPropagation();
         }}
       >
+        {this.state.isOpenDelete && <DeletePopup {...deletePopupProps} />}
         <div className="edit-dialog-title">
-          <Trans>Edit shelf</Trans>
+          <Trans>Manage shelf</Trans>
         </div>
         <div className="import-dialog-option">
           {
@@ -147,6 +180,16 @@ class SortShelfDialog extends React.Component<
                     <span className="sort-shelf-label">
                       {this.props.t(item.name)}
                     </span>
+                    <span
+                      className="icon-trash-line "
+                      onClick={async () => {
+                        this.setState({
+                          currentDeleteShelf: item.name,
+                        });
+                        this.handleDeletePopup(true);
+                      }}
+                      style={{ fontSize: "20px", marginRight: "15px" }}
+                    ></span>
                     <span
                       className="icon-edit-line "
                       onClick={async () => {

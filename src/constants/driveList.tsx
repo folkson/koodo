@@ -6,6 +6,7 @@ export const driveList = [
     isPro: false,
     support: ["desktop", "browser", "phone"],
     scoped: false,
+    isCNAvailable: true,
   },
   {
     label: "Dropbox",
@@ -14,6 +15,7 @@ export const driveList = [
     isPro: true,
     support: ["desktop", "browser", "phone"],
     scoped: true,
+    isCNAvailable: false,
   },
   {
     label: "OneDrive",
@@ -22,6 +24,7 @@ export const driveList = [
     isPro: true,
     support: ["desktop", "browser", "phone"],
     scoped: true,
+    isCNAvailable: true,
   },
   {
     label: "Google Drive",
@@ -30,6 +33,7 @@ export const driveList = [
     isPro: true,
     support: ["desktop", "browser", "phone"],
     scoped: true,
+    isCNAvailable: false,
   },
   {
     label: "MEGA",
@@ -38,6 +42,7 @@ export const driveList = [
     isPro: true,
     support: ["desktop", "browser"],
     scoped: false,
+    isCNAvailable: false,
   },
   {
     label: "Box",
@@ -46,6 +51,7 @@ export const driveList = [
     isPro: true,
     support: ["desktop", "browser", "phone"],
     scoped: false,
+    isCNAvailable: false,
   },
   {
     label: "pCloud",
@@ -54,6 +60,7 @@ export const driveList = [
     isPro: true,
     support: ["desktop", "phone"],
     scoped: true,
+    isCNAvailable: false,
   },
   {
     label: "Aliyun Drive",
@@ -62,6 +69,7 @@ export const driveList = [
     isPro: true,
     support: ["desktop", "phone"],
     scoped: false,
+    isCNAvailable: true,
   },
   {
     label: "S3 Compatible",
@@ -70,6 +78,16 @@ export const driveList = [
     isPro: true,
     support: ["desktop", "browser", "phone"],
     scoped: false,
+    isCNAvailable: true,
+  },
+  {
+    label: "Docker",
+    value: "docker",
+    icon: "icon-docker",
+    isPro: true,
+    support: ["desktop", "browser", "phone"],
+    scoped: true,
+    isCNAvailable: true,
   },
   {
     label: "FTP",
@@ -78,6 +96,7 @@ export const driveList = [
     isPro: false,
     support: ["desktop"],
     scoped: false,
+    isCNAvailable: true,
   },
   {
     label: "SFTP",
@@ -86,6 +105,7 @@ export const driveList = [
     isPro: false,
     support: ["desktop"],
     scoped: false,
+    isCNAvailable: true,
   },
 ];
 interface ConfigItem {
@@ -115,6 +135,27 @@ export const driveInputConfig: DriveInputConfig = {
       type: "text",
       required: true,
       example: "KoodoReader",
+    },
+    {
+      label: "Username",
+      value: "username",
+      type: "text",
+      required: true,
+    },
+    {
+      label: "Password",
+      value: "password",
+      type: "password",
+      required: true,
+    },
+  ],
+  docker: [
+    {
+      label: "Server address",
+      value: "url",
+      type: "text",
+      required: true,
+      example: "http://192.168.28.14:8080",
     },
     {
       label: "Username",
