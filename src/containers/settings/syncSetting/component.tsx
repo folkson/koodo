@@ -176,6 +176,7 @@ class SyncSetting extends React.Component<SettingInfoProps, SettingInfoState> {
     }
     if (
       this.props.settingDrive === "webdav" ||
+      this.props.settingDrive === "docker" ||
       this.props.settingDrive === "ftp" ||
       this.props.settingDrive === "sftp" ||
       this.props.settingDrive === "mega" ||
@@ -272,6 +273,7 @@ class SyncSetting extends React.Component<SettingInfoProps, SettingInfoState> {
             }}
           >
             {this.props.settingDrive === "webdav" ||
+            this.props.settingDrive === "docker" ||
             this.props.settingDrive === "ftp" ||
             this.props.settingDrive === "sftp" ||
             this.props.settingDrive === "mega" ||
@@ -279,7 +281,7 @@ class SyncSetting extends React.Component<SettingInfoProps, SettingInfoState> {
               <>
                 {driveInputConfig[this.props.settingDrive].map((item) => {
                   return (
-                    <>
+                    <div key={item.value}>
                       <input
                         type={item.type}
                         name={item.value}
@@ -310,11 +312,18 @@ class SyncSetting extends React.Component<SettingInfoProps, SettingInfoState> {
                         className="token-dialog-username-box"
                       />
                       {item.example && (
-                        <div style={{ marginTop: "5px", fontSize: "12px" }}>
+                        <div
+                          style={{
+                            marginTop: "5px",
+                            marginLeft: "2px",
+                            fontSize: "12px",
+                            opacity: 0.8,
+                          }}
+                        >
                           {this.props.t("Example")}: {item.example}
                         </div>
                       )}
-                    </>
+                    </div>
                   );
                 })}
               </>
@@ -353,7 +362,22 @@ class SyncSetting extends React.Component<SettingInfoProps, SettingInfoState> {
                 }}
               >
                 {this.props.t(
-                  "Only WebDAV service provided by Alist is directly supported in Browser, Other WebDAV services need to enable CORS to work properly"
+                  "Only WebDAV service provided by Alist is directly supported in Browser, Other WebDAV services need to enable CORS to work properly. Also due to browser's security restrictions, the WebDAV service must be accessed via HTTPS protocol when you're visiting Koodo Reader via HTTPS protocal."
+                )}
+              </div>
+            )}
+            {this.props.settingDrive === "docker" && !isElectron && (
+              <div
+                className="token-dialog-tip"
+                style={{
+                  marginTop: "10px",
+                  fontSize: "13px",
+                  lineHeight: "16px",
+                  color: "rgba(231, 69, 69, 0.8)",
+                }}
+              >
+                {this.props.t(
+                  "The Koodo Reader Docker version does not support the data source feature by default. You need to modify the configuration parameters during deployment to manually enable it. Also due to browser's security restrictions, the Docker service must be accessed via HTTPS protocol when you're visiting Koodo Reader via HTTPS protocal."
                 )}
               </div>
             )}
@@ -368,7 +392,7 @@ class SyncSetting extends React.Component<SettingInfoProps, SettingInfoState> {
                 }}
               >
                 {this.props.t(
-                  "Some S3 services are not compatible with browser environments. If you encounter connection issues, please refer to the service provider's official documentation for instructions on enabling CORS."
+                  "Some S3 services are not compatible with browser environments. If you encounter connection issues, please refer to the service provider's official documentation for instructions on enabling CORS. Also due to browser's security restrictions, the S3 service must be accessed via HTTPS protocol when you're visiting Koodo Reader via HTTPS protocal."
                 )}
               </div>
             )}
@@ -377,6 +401,7 @@ class SyncSetting extends React.Component<SettingInfoProps, SettingInfoState> {
                 className="voice-add-confirm"
                 onClick={async () => {
                   if (
+                    this.props.settingDrive === "docker" ||
                     this.props.settingDrive === "webdav" ||
                     this.props.settingDrive === "s3compatible"
                   ) {
@@ -422,6 +447,7 @@ class SyncSetting extends React.Component<SettingInfoProps, SettingInfoState> {
                   </div>
                 )}
                 {(this.props.settingDrive === "webdav" ||
+                  this.props.settingDrive === "docker" ||
                   this.props.settingDrive === "ftp" ||
                   this.props.settingDrive === "sftp" ||
                   this.props.settingDrive === "mega" ||
@@ -473,7 +499,12 @@ class SyncSetting extends React.Component<SettingInfoProps, SettingInfoState> {
                 isPro: false,
                 support: ["desktop", "browser", "phone"],
               },
-              ...driveList,
+              ...driveList.filter((item) => {
+                if (ConfigService.getItem("serverRegion") === "china") {
+                  return item.isCNAvailable;
+                }
+                return true;
+              }),
             ]
               .filter((item) => !this.props.dataSourceList.includes(item.value))
               .filter((item) => {
@@ -501,7 +532,15 @@ class SyncSetting extends React.Component<SettingInfoProps, SettingInfoState> {
             className="lang-setting-dropdown"
             onChange={this.handleDeleteDataSource}
           >
-            {[{ label: "Please select", value: "", isPro: false }, ...driveList]
+            {[
+              { label: "Please select", value: "", isPro: false },
+              ...driveList.filter((item) => {
+                if (ConfigService.getItem("serverRegion") === "china") {
+                  return item.isCNAvailable;
+                }
+                return true;
+              }),
+            ]
               .filter(
                 (item) =>
                   this.props.dataSourceList.includes(item.value) ||
@@ -528,7 +567,12 @@ class SyncSetting extends React.Component<SettingInfoProps, SettingInfoState> {
             >
               {[
                 { label: "Please select", value: "", isPro: false },
-                ...driveList,
+                ...driveList.filter((item) => {
+                  if (ConfigService.getItem("serverRegion") === "china") {
+                    return item.isCNAvailable;
+                  }
+                  return true;
+                }),
               ]
                 .filter(
                   (item) =>
