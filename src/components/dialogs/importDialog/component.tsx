@@ -12,7 +12,11 @@ import { isElectron } from "react-device-detect";
 import { checkStableUpdate } from "../../../utils/request/common";
 import { getCloudConfig } from "../../../utils/file/common";
 import SyncService from "../../../utils/storage/syncService";
-import { getStorageLocation } from "../../../utils/common";
+import { getStorageLocation, openExternalUrl } from "../../../utils/common";
+import {
+  ConfigService,
+  SyncUtil,
+} from "../../../assets/lib/kookit-extra-browser.min";
 class ImportDialog extends React.Component<
   ImportDialogProps,
   ImportDialogState
@@ -138,6 +142,87 @@ class ImportDialog extends React.Component<
     toast.dismiss("importing");
     this.props.importBookFunc(file);
   };
+  listAllFilesRecursively = async (folderName: string) => {
+    toast.loading(this.props.t("Scanning folder"), {
+      id: "scanning",
+    });
+
+    try {
+      const allFiles = await this.getAllFilesInFolder(
+        this.state.currentPath + "/" + folderName
+      );
+
+      // Filter only files (not folders) and get full paths
+      const fileList = allFiles.filter((file) => file.indexOf(".") !== -1);
+
+      if (fileList.length === 0) {
+        toast.dismiss("scanning");
+        toast(this.props.t("No files found in this folder"));
+        return;
+      }
+
+      // Add all files to selected list
+      this.setState({
+        selectedFileList: Array.from(
+          new Set([
+            ...this.state.selectedFileList,
+            ...fileList.filter(
+              (file) => !this.state.selectedFileList.includes(file)
+            ),
+          ])
+        ),
+      });
+
+      toast.dismiss("scanning");
+      toast.success(this.props.t("Successfully scanned folder"));
+    } catch (error) {
+      toast.dismiss("scanning");
+      toast.error(this.props.t("Error scanning folder"));
+      console.error("Error scanning folder:", error);
+    }
+  };
+
+  getAllFilesInFolder = async (folderPath: string): Promise<string[]> => {
+    let allFiles: string[] = [];
+
+    try {
+      let fileList: string[] = [];
+
+      if (isElectron) {
+        const { ipcRenderer } = window.require("electron");
+        let tokenConfig = await getCloudConfig(this.state.currentDrive);
+        fileList = await ipcRenderer.invoke("picker-list", {
+          ...tokenConfig,
+          baseFolder: "",
+          service: this.state.currentDrive,
+          currentPath: folderPath,
+          storagePath: getStorageLocation(),
+        });
+      } else {
+        let pickerUtil = await SyncService.getPickerUtil(
+          this.state.currentDrive
+        );
+        fileList = await pickerUtil.listFiles(folderPath);
+      }
+
+      for (const item of fileList) {
+        const fullPath = folderPath + "/" + item;
+
+        if (item.indexOf(".") === -1) {
+          // It's a folder, recursively get files from it
+          const subFiles = await this.getAllFilesInFolder(fullPath);
+          allFiles = allFiles.concat(subFiles);
+        } else {
+          // It's a file, add to list
+          allFiles.push(fullPath);
+        }
+      }
+    } catch (error) {
+      console.error("Error listing files in folder:", error);
+    }
+
+    return allFiles;
+  };
   render() {
     return (
       <div
@@ -151,6 +236,12 @@ class ImportDialog extends React.Component<
           {this.state.currentDrive === "" && (
             <>
               {driveList
+                .filter((item) => {
+                  if (ConfigService.getItem("serverRegion") === "china") {
+                    return item.isCNAvailable;
+                  }
+                  return true;
+                })
                 .filter(
                   (item) =>
                     !item.scoped &&
@@ -162,11 +253,24 @@ class ImportDialog extends React.Component<
                     className={`cloud-drive-item `}
                     onClick={() => {
                       if (!this.props.dataSourceList.includes(item.value)) {
-                        toast(
-                          this.props.t(
-                            "Please add data source in the setting-Sync and backup first"
-                          )
-                        );
+                        this.props.handleSetting(true);
+                        this.props.handleSettingMode("sync");
+                        this.props.handleSettingDrive(item.value);
+                        let settingDrive = item.value;
+                        if (
+                          settingDrive === "dropbox" ||
+                          settingDrive === "google" ||
+                          settingDrive === "boxnet" ||
+                          settingDrive === "pcloud" ||
+                          settingDrive === "adrive" ||
+                          settingDrive === "microsoft_exp" ||
+                          settingDrive === "google_exp" ||
+                          settingDrive === "microsoft"
+                        ) {
+                          openExternalUrl(
+                            new SyncUtil(settingDrive, {}).getAuthUrl()
+                          );
+                        }
                         return;
                       }
                       this.setState({
@@ -196,6 +300,22 @@ class ImportDialog extends React.Component<
                 >
                   {item}
                 </span>
+                {item.indexOf(".") === -1 && (
+                  <span
+                    className="import-dialog-folder-button"
+                    onClick={() => {
+                      //list all files in the folder and its subfolder
+                      this.listAllFilesRecursively(item);
+                    }}
+                  >
+                    <span
+                      data-tooltip-id="my-tooltip"
+                      data-tooltip-content={this.props.t("Import folder")}
+                    >
+                      <span className="icon-import import-dialog-folder-icon"></span>
+                    </span>
+                  </span>
+                )}
                 {item.indexOf(".") === -1 ? (
                   <span
                     className="icon-dropdown import-dialog-more-file"

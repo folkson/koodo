@@ -11,13 +11,15 @@ export interface SettingInfoProps extends RouteComponentProps<any> {
   handleFetchDataSourceList: () => void;
   handleFetchDefaultSyncOption: () => void;
   handleFetchLoginOptionList: () => void;
-  handleLoginOptionList: (loginOptionList: string[]) => void;
+  handleLoginOptionList: (
+    loginOptionList: { email: string; provider: string }[]
+  ) => void;
   handleFetchAuthed: () => void;
   handleLoadingDialog: (isShow: boolean) => void;
   t: (title: string) => string;
   handleFetchBooks: () => void;
   handleFetchPlugins: () => void;
-  handleFetchUserInfo: () => void;
+  handleFetchUserInfo: () => Promise<void>;
   bookmarks: BookmarkModel[];
   notes: NoteModel[];
   isOpenTokenDialog: boolean;
@@ -25,7 +27,7 @@ export interface SettingInfoProps extends RouteComponentProps<any> {
   books: BookModel[];
   userInfo: any;
   dataSourceList: string[];
-  loginOptionList: string[];
+  loginOptionList: { email: string; provider: string }[];
   defaultSyncOption: string;
   isAuthed: boolean;
   settingMode: string;
@@ -37,7 +39,7 @@ export interface SettingInfoState {
   redeemCode: string;
   loginConfig: any;
   settingLogin: string;
-
+  serverRegion: string;
   isSendingCode: boolean;
   countdown: number;
 }
