@@ -14,6 +14,7 @@ import { isElectron } from "react-device-detect";
 import {
   getCloudConfig,
   getLastSyncTimeFromConfigJson,
+  removeCloudConfig,
   upgradeConfig,
   upgradePro,
   upgradeStorage,
@@ -27,14 +28,19 @@ import CoverUtil from "../../utils/file/coverUtil";
 import BookUtil from "../../utils/file/bookUtil";
 import {
   addChatBox,
+  checkBrokenData,
   checkMissingBook,
   getChatLocale,
   getStorageLocation,
   removeChatBox,
+  WEBSITE_URL,
 } from "../../utils/common";
 import { driveList } from "../../constants/driveList";
 import SupportDialog from "../../components/dialogs/supportDialog";
 import SyncService from "../../utils/storage/syncService";
+import { LocalFileManager } from "../../utils/file/localFile";
+import { updateUserConfig } from "../../utils/request/user";
+declare var window: any;
 
 class Header extends React.Component<HeaderProps, HeaderState> {
   timer: any;
@@ -100,6 +106,23 @@ class Header extends React.Component<HeaderProps, HeaderState> {
       }
     } else {
       upgradeConfig();
+      const status = await LocalFileManager.getPermissionStatus();
+      if (
+        !ConfigService.getReaderConfig("isUseLocal") &&
+        LocalFileManager.isSupported()
+      ) {
+        this.props.handleLocalFileDialog(true);
+      } else if (
+        ConfigService.getReaderConfig("isUseLocal") === "yes" &&
+        !status.directoryName
+      ) {
+        this.props.handleLocalFileDialog(true);
+      } else if (
+        ConfigService.getReaderConfig("isUseLocal") === "yes" &&
+        (status.needsReauthorization || !status.hasAccess)
+      ) {
+        this.props.handleLocalFileDialog(true);
+      }
     }
     window.addEventListener("resize", () => {
       this.setState({ width: document.body.clientWidth });
@@ -132,10 +155,6 @@ class Header extends React.Component<HeaderProps, HeaderState> {
   ) {
     if (nextProps.isAuthed && nextProps.isAuthed !== this.props.isAuthed) {
       if (isElectron) {
-        window.require("electron").ipcRenderer.invoke("new-chat", {
-          url: "https://dl.koodoreader.com/chat.html",
-          locale: getChatLocale(),
-        });
       } else {
         addChatBox();
       }
@@ -155,10 +174,6 @@ class Header extends React.Component<HeaderProps, HeaderState> {
     }
     if (!nextProps.isAuthed && nextProps.isAuthed !== this.props.isAuthed) {
       if (isElectron) {
-        window.require("electron").ipcRenderer.invoke("exit-chat", {
-          url: "https://dl.koodoreader.com/chat.html",
-          locale: getChatLocale(),
-        });
       } else {
         removeChatBox();
       }
@@ -233,7 +248,56 @@ class Header extends React.Component<HeaderProps, HeaderState> {
       this.setState({ isSync: false });
       return false;
     }
+    if (
+      ConfigService.getItem("defaultSyncOption") === "google" &&
+      !config.version
+    ) {
+      let targetDrive = "google";
+      await TokenService.setToken(targetDrive + "_token", "");
+      SyncService.removeSyncUtil(targetDrive);
+      removeCloudConfig(targetDrive);
+      if (isElectron) {
+        const { ipcRenderer } = window.require("electron");
+        await ipcRenderer.invoke("cloud-close", {
+          service: targetDrive,
+        });
+      }
+      ConfigService.deleteListConfig(targetDrive, "dataSourceList");
+      this.props.handleFetchDataSourceList();
+      if (targetDrive === ConfigService.getItem("defaultSyncOption")) {
+        ConfigService.removeItem("defaultSyncOption");
+        this.props.handleFetchDefaultSyncOption();
+      }
+      if (ConfigService.getReaderConfig("isEnableKoodoSync") === "yes") {
+        await updateUserConfig({
+          is_enable_koodo_sync: "no",
+        });
+        setTimeout(() => {
+          updateUserConfig({
+            is_enable_koodo_sync: "yes",
+          });
+        }, 1000);
+      }
+      toast(
+        this.props.t(
+          "In order to let you directly manage your data in Google Drive, we have deprecated the old Google Drive token. Please reauthorize Google Drive in the settings. Your new data will be stored in the root directory of your Google Drive, and you can manage it directly in the Google Drive web interface."
+        ),
+        { duration: 4000 }
+      );
+      this.setState({ isSync: false });
+      return false;
+    }
     checkMissingBook(this.props.books);
+    let checkResult = await checkBrokenData();
+    if (checkResult) {
+      toast.error(
+        this.props.t(
+          "Broken data detected, please click the setting button to reset the sync records"
+        )
+      );
+      this.setState({ isSync: false });
+      return false;
+    }
     if (ConfigService.getReaderConfig("isEnableKoodoSync") !== "yes") {
       toast.loading(
         this.props.t("Start syncing") +
@@ -347,14 +411,26 @@ class Header extends React.Component<HeaderProps, HeaderState> {
         }
       }
     }, 1000);
-    let res = await this.beforeSync();
-    if (!res) {
+    try {
+      let res = await this.beforeSync();
+      if (!res) {
+        this.setState({ isSync: false });
+        clearInterval(this.timer);
+        return;
+      }
+      let compareResult = await this.getCompareResult();
+      await this.handleSync(compareResult);
+      clearInterval(this.timer);
+      this.setState({ isSync: false });
+    } catch (error) {
+      console.error(error);
+      toast.error(this.props.t("Sync failed"), {
+        id: "syncing",
+      });
+      clearInterval(this.timer);
+      this.setState({ isSync: false });
       return;
     }
-    let compareResult = await this.getCompareResult();
-
-    await this.handleSync(compareResult);
-    this.setState({ isSync: false });
   };
   handleSuccess = async () => {
     this.props.handleFetchBooks();
@@ -413,6 +489,7 @@ class Header extends React.Component<HeaderProps, HeaderState> {
       toast.error(this.props.t("Sync failed"), {
         id: "syncing",
       });
+      clearInterval(this.timer);
       return;
     }
   };
@@ -442,6 +519,31 @@ class Header extends React.Component<HeaderProps, HeaderState> {
         className="header"
         style={this.props.isCollapsed ? { marginLeft: "40px" } : {}}
       >
+        {isElectron && this.props.isAuthed && (
+          <div
+            className="header-chat-widget"
+            onClick={() => {
+              window.require("electron").ipcRenderer.invoke("new-chat", {
+                url:
+                  WEBSITE_URL +
+                  (ConfigService.getReaderConfig("lang").startsWith("zh")
+                    ? "/zh/faq"
+                    : "/en/faq"),
+                locale: getChatLocale(),
+              });
+            }}
+          >
+            <img
+              src={require("../../assets/images/chat-widget.png")}
+              alt="logo"
+              className="login-mobile-qr"
+              style={{
+                width: "100%",
+                height: "100%",
+              }}
+            />
+          </div>
+        )}
         <div
           className="header-search-container"
           style={this.props.isCollapsed ? { width: "369px" } : {}}

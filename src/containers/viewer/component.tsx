@@ -34,7 +34,7 @@ class Viewer extends React.Component<ViewerProps, ViewerState> {
       rect: null,
       key: "",
       isFirst: true,
-      scale: ConfigService.getReaderConfig("scale") || 1,
+      scale: ConfigService.getReaderConfig("scale") || "1",
       chapterTitle:
         ConfigService.getObjectConfig(
           this.props.currentBook.key,
@@ -174,7 +174,9 @@ class Viewer extends React.Component<ViewerProps, ViewerState> {
         ConfigService.getReaderConfig("isSliding") === "yes" ? "sliding" : "",
         ConfigService.getReaderConfig("convertChinese"),
         "",
-        "no",
+        ConfigService.getReaderConfig("backgroundColor") === "rgba(44,47,49,1)"
+          ? "yes"
+          : "no",
         "no",
         Kookit
       );

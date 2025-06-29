@@ -25,6 +25,8 @@ class NavigationPanel extends React.Component<
       searchList: null,
       startIndex: 0,
       currentIndex: 0,
+      cover: "",
+      isCoverExist: false,
     };
   }
   handleNavSearchState = (state: string) => {
@@ -40,6 +42,16 @@ class NavigationPanel extends React.Component<
   handleSearchList = (searchList: any) => {
     this.setState({ searchList });
   };
+  async UNSAFE_componentWillReceiveProps(nextProps: NavigationPanelProps) {
+    if (nextProps.currentBook.key !== this.props.currentBook.key) {
+      let cover = await CoverUtil.getCover(nextProps.currentBook);
+      let isCoverExist = await CoverUtil.isCoverExist(nextProps.currentBook);
+      this.setState({
+        cover,
+        isCoverExist,
+      });
+    }
+  }
   componentDidMount() {
     this.props.handleFetchBookmarks();
   }
@@ -250,12 +262,8 @@ class NavigationPanel extends React.Component<
                 }}
               ></span>
 
-              {CoverUtil.isCoverExist(this.props.currentBook) ? (
-                <img
-                  className="book-cover"
-                  src={CoverUtil.getCover(this.props.currentBook)}
-                  alt=""
-                />
+              {this.state.isCoverExist ? (
+                <img className="book-cover" src={this.state.cover} alt="" />
               ) : (
                 <div className="book-cover">
                   <EmptyCover

@@ -61,11 +61,28 @@ class PopupRefer extends React.Component<PopupReferProps, PopupReferStates> {
         return false;
       }
       this.setState({ href: href });
-      if (href.indexOf("#") === 0) {
+      if (href.indexOf("#") > -1) {
         let id = href.split("#").reverse()[0];
-        let node = doc.body.querySelector("#" + id);
-        if (!node) return false;
+        let node = doc.body.querySelector("#" + CSS.escape(id));
+        if (!node) {
+          //can't find the node, go to href
+          if (href.indexOf("#") !== 0) {
+            let chapterInfo = rendition.resolveChapter(href.split("#")[0]);
+            await rendition.goToChapter(
+              chapterInfo.index,
+              chapterInfo.href,
+              chapterInfo.label
+            );
+          }
+          await rendition.goToNode(
+            doc.body.querySelector("#" + CSS.escape(id)) || doc.body
+          );
+          return true;
+        }
         //将html代码中的img标签由blob转换为base64
+        if (node.textContent.trim() === event.target.textContent.trim()) {
+          node = node.parentElement;
+        }
         let htmlContent = node.innerHTML;
 
         const convertBlobToDataURL = async (blobUrl) => {
@@ -111,17 +128,6 @@ class PopupRefer extends React.Component<PopupReferProps, PopupReferStates> {
 
         return true;
       }
-      if (href.indexOf("#") !== 0) {
-        let chapterInfo = rendition.resolveChapter(href.split("#")[0]);
-        await rendition.goToChapter(
-          chapterInfo.index,
-          chapterInfo.href,
-          chapterInfo.label
-        );
-      }
-      let id = href.split("#").reverse()[0];
-      await rendition.goToNode(doc.body.querySelector("#" + id) || doc.body);
-      return true;
     } else if (
       href &&
       rendition.resolveChapter &&
@@ -204,11 +210,11 @@ class PopupRefer extends React.Component<PopupReferProps, PopupReferStates> {
     if (posY < 0) {
       posY = 20;
     }
-    if (posX > document.body.clientWidth - 250) {
-      posX = document.body.clientWidth - 250;
+    if (posX > document.body.clientWidth - 290 - 20) {
+      posX = document.body.clientWidth - 290 - 20;
     }
-    if (posY > document.body.clientHeight - 250) {
-      posY = document.body.clientHeight - 250;
+    if (posY > document.body.clientHeight - 250 - 20) {
+      posY = document.body.clientHeight - 250 - 20;
     }
     return { posX, posY } as any;
   }
@@ -267,7 +273,7 @@ class PopupRefer extends React.Component<PopupReferProps, PopupReferStates> {
                     ),
                   });
                   await this.props.rendition.goToNode(
-                    doc.body.querySelector("#" + id) || doc.body
+                    doc.body.querySelector("#" + CSS.escape(id)) || doc.body
                   );
                 }}
                 style={{

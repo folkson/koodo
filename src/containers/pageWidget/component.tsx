@@ -12,7 +12,6 @@ class Background extends React.Component<BackgroundProps, BackgroundState> {
       isSingle: this.props.readerMode !== "double",
       prevPage: 0,
       nextPage: 0,
-      scale: ConfigService.getReaderConfig("scale") || 1,
       isHideFooter: ConfigService.getReaderConfig("isHideFooter") === "yes",
       isHideHeader: ConfigService.getReaderConfig("isHideHeader") === "yes",
     };
@@ -85,7 +84,7 @@ class Background extends React.Component<BackgroundProps, BackgroundState> {
                   ConfigService.getReaderConfig("isOSNight") === "yes")
               ? "rgba(44,47,49,1)"
               : "rgba(255,255,255,1)",
-          filter: `brightnessbrightness(${
+          filter: `brightness(${
             ConfigService.getReaderConfig("brightness") || 1
           }) invert(${
             ConfigService.getReaderConfig("isInvert") === "yes" ? 1 : 0
