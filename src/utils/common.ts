@@ -16,6 +16,26 @@ import toast from "react-hot-toast";
 import i18n from "../i18n";
 import { getThirdpartyRequest } from "./request/thirdparty";
 declare var window: any;
+export const supportedFormats = [
+  ".epub",
+  ".pdf",
+  ".txt",
+  ".mobi",
+  ".azw3",
+  ".azw",
+  ".htm",
+  ".html",
+  ".xml",
+  ".xhtml",
+  ".mhtml",
+  ".docx",
+  ".md",
+  ".fb2",
+  ".cbz",
+  ".cbt",
+  ".cbr",
+  ".cb7",
+];
 export const calculateFileMD5 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -180,7 +200,7 @@ export const getPageWidth = (
   let pageWidth = "";
   if (readerMode === "scroll" || readerMode === "single") {
     let preWidth =
-      document.body.clientWidth * parseFloat(scale) -
+      document.body.clientWidth * Math.abs(parseFloat(scale)) -
       document.body.clientWidth * 0.4 -
       (isNavLocked ? 300 : 0) -
       (isSettingLocked ? 300 : 0);
@@ -323,21 +343,24 @@ export const preCacheAllBooks = async (bookList: Book[]) => {
       true,
       selectedBook.path
     );
-    let rendition = BookHelper.getRendtion(
+    let rendition = BookHelper.getRendition(
       result,
-      selectedBook.format,
-      "",
-      selectedBook.charset,
-      ConfigService.getReaderConfig("isSliding") === "yes" ? "sliding" : "",
-      ConfigService.getReaderConfig("convertChinese"),
-      "",
-      "no",
-      "no",
+      {
+        format: selectedBook.format,
+        readerMode: "",
+        charset: selectedBook.charset,
+        animation:
+          ConfigService.getReaderConfig("isSliding") === "yes" ? "sliding" : "",
+        convertChinese: ConfigService.getReaderConfig("convertChinese"),
+        parserRegex: "",
+        isDarkMode: "no",
+        isMobile: "no",
+      },
       Kookit
     );
     let cache = await rendition.preCache(result);
     if (cache !== "err" || cache) {
-      BookUtil.addBook("cache-" + selectedBook.key, "zip", cache);
+      await BookUtil.addBook("cache-" + selectedBook.key, "zip", cache);
     }
   }
 };
@@ -478,6 +501,7 @@ export const getDefaultTransTarget = (langList) => {
     zhTW: "Chinese",
     zhMO: "Chinese",
     ja: "Japanese",
+    uk: "Ukrainian",
     ko: "Korean",
     vi: "Vietnamese",
     th: "Thai",
@@ -535,6 +559,19 @@ export const checkMissingBook = (bookList: Book[]) => {
       fs.copyFileSync(book.path, expectedPath);
     }
   }
+};
+export const checkBrokenData = async () => {
+  let localSyncRecords = ConfigService.getAllSyncRecord();
+  let localBooks = Object.keys(localSyncRecords).filter(
+    (item) =>
+      item.startsWith("database.sqlite.books") &&
+      localSyncRecords[item].operation !== "delete"
+  );
+  let actualbooks = await DatabaseService.getAllRecords("books");
+  if (localBooks.length > 0 && actualbooks.length === 0) {
+    return true;
+  }
+  return false;
 };
 export const testConnection = async (driveName: string, driveConfig: any) => {
   toast.loading(i18n.t("Testing connection..."), {

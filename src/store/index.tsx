@@ -77,11 +77,12 @@ export type stateType = {
   };
   backupPage: {
     isBackup: boolean;
+    isOpenLocalFileDialog: boolean;
     isOpenImportDialog: boolean;
     isOpenSortShelfDialog: boolean;
     isOpenTokenDialog: boolean;
     dataSourceList: string[];
-    loginOptionList: string[];
+    loginOptionList: { email: string; provider: string }[];
     defaultSyncOption: string;
   };
   progressPanel: {
@@ -91,7 +92,6 @@ export type stateType = {
   reader: {
     bookmarks: BookmarkModel[];
     notes: NoteModel[];
-    digests: NoteModel[];
     color: number;
     chapters: any[];
     readerMode: string;

@@ -12,6 +12,7 @@ import {
   handleFeedbackDialog,
   handleSetting,
   handleBackupDialog,
+  handleLocalFileDialog,
   handleImportDialog,
   handleFetchNotes,
   handleFetchBookmarks,
@@ -32,7 +33,6 @@ const mapStateToProps = (state: stateType) => {
   return {
     books: state.manager.books,
     notes: state.reader.notes,
-    digests: state.reader.digests,
     bookmarks: state.reader.bookmarks,
     isReading: state.book.isReading,
     mode: state.sidebar.mode,
@@ -55,6 +55,7 @@ const mapStateToProps = (state: stateType) => {
     isBackup: state.backupPage.isBackup,
     isOpenImportDialog: state.backupPage.isOpenImportDialog,
     isOpenSortShelfDialog: state.backupPage.isOpenSortShelfDialog,
+    isOpenLocalFileDialog: state.backupPage.isOpenLocalFileDialog,
   };
 };
 const actionCreator = {
@@ -76,6 +77,7 @@ const actionCreator = {
   handleNewDialog,
   handleShowSupport,
   handleBackupDialog,
+  handleLocalFileDialog,
   handleImportDialog,
   handleReadingState,
   handleShowPopupNote,
