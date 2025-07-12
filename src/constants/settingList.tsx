@@ -32,6 +32,16 @@ export const generalSettingList = [
   },
   {
     isElectron: true,
+    title: "Windows always on top",
+    propName: "isAlwaysOnTop",
+  },
+  {
+    isElectron: true,
+    title: "Automatically launch on system startup",
+    propName: "isAutoLaunch",
+  },
+  {
+    isElectron: true,
     title: "Open book without adding it to library",
     desc: "When opening books in the file manager with Koodo, the opened books won't be added to the library",
     propName: "isPreventAdd",
@@ -187,6 +197,7 @@ export const langList = [
   { label: "Tagalog", value: "tl" },
   { label: "Slovenščina", value: "sl" },
   { label: "Srpski", value: "sr" },
+  { label: "Українська", value: "uk" },
 ];
 
 export const searchList = [
@@ -211,11 +222,10 @@ export const readerSettingList = [
     title: "Sliding animation",
     propName: "isSliding",
   },
-  //TODO: add this feature in the future
-  // {
-  //   title: "Turn on pure mode for PDF",
-  //   propName: "isPurePdf",
-  // },
+  {
+    title: "Render PDF from even page",
+    propName: "isStartFromEven",
+  },
   {
     title: "Text indentation",
     propName: "isIndent",

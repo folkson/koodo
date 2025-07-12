@@ -15,10 +15,11 @@ import Book from "../../models/Book";
 import i18n from "../../i18n";
 import { getCloudConfig } from "./common";
 import CoverUtil from "./coverUtil";
+import { LocalFileManager } from "./localFile";
 declare var window: any;
 
 class BookUtil {
-  static addBook(key: string, format: string, buffer: ArrayBuffer) {
+  static async addBook(key: string, format: string, buffer: ArrayBuffer) {
     // for both original books and cached boks
 
     if (isElectron) {
@@ -38,7 +39,12 @@ class BookUtil {
         throw error;
       }
     } else {
-      localforage.setItem(key, buffer);
+      if (ConfigService.getReaderConfig("isUseLocal") === "yes") {
+        await LocalFileManager.saveFile(key + "." + format, buffer, "book");
+      } else {
+        await localforage.setItem(key, buffer);
+      }
+
       this.uploadBook(key, format);
     }
   }
@@ -63,7 +69,11 @@ class BookUtil {
       });
     } else {
       this.deleteCloudBook(key, format);
-      return localforage.removeItem(key);
+      if (ConfigService.getReaderConfig("isUseLocal") === "yes") {
+        return LocalFileManager.deleteFile(key + "." + format, "book");
+      } else {
+        return localforage.removeItem(key);
+      }
     }
   }
   static isBookExist(key: string, format: string, bookPath: string) {
@@ -88,13 +98,21 @@ class BookUtil {
           resolve(false);
         }
       } else {
-        localforage.getItem(key).then((result) => {
-          if (result) {
-            resolve(true);
-          } else {
-            resolve(false);
-          }
-        });
+        if (ConfigService.getReaderConfig("isUseLocal") === "yes") {
+          LocalFileManager.fileExists(key + "." + format, "book").then(
+            (exists) => {
+              resolve(exists);
+            }
+          );
+        } else {
+          localforage.getItem(key).then((result) => {
+            if (result) {
+              resolve(true);
+            } else {
+              resolve(false);
+            }
+          });
+        }
       }
     });
   }
@@ -134,7 +152,14 @@ class BookUtil {
         }
       });
     } else {
-      return localforage.getItem(key) as Promise<ArrayBuffer>;
+      if (ConfigService.getReaderConfig("isUseLocal") === "yes") {
+        return LocalFileManager.readFile(
+          key + "." + format,
+          "book"
+        ) as Promise<ArrayBuffer>;
+      } else {
+        return localforage.getItem(key) as Promise<ArrayBuffer>;
+      }
     }
   }
   static fetchAllBooks(Books: BookModel[]) {
@@ -157,7 +182,7 @@ class BookUtil {
       !(await this.isBookExist("cache-" + book.key, "zip", book.path))
     ) {
       if (!ConfigService.getItem("defaultSyncOption")) {
-        toast(i18n.t("Please select a sync service"));
+        toast(i18n.t("Please add data source in the setting"));
         return;
       }
       toast.loading(i18n.t("Downloading"), {
@@ -229,6 +254,7 @@ class BookUtil {
           isMergeWord: ConfigService.getReaderConfig("isMergeWord"),
           isAutoFullscreen: ConfigService.getReaderConfig("isAutoFullscreen"),
           isPreventSleep: ConfigService.getReaderConfig("isPreventSleep"),
+          isAlwaysOnTop: ConfigService.getReaderConfig("isAlwaysOnTop"),
         });
       }
     } else {

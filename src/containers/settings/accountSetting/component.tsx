@@ -25,9 +25,12 @@ import {
   getTempToken,
   getUserRequest,
   loginRegister,
+  resetUserRequest,
 } from "../../../utils/request/user";
 import { handleExitApp } from "../../../utils/request/common";
 import copyTextToClipboard from "copy-text-to-clipboard";
+import { resetReaderRequest } from "../../../utils/request/reader";
+import { resetThirdpartyRequest } from "../../../utils/request/thirdparty";
 declare var window: any;
 class AccountSetting extends React.Component<
   SettingInfoProps,
@@ -42,8 +45,8 @@ class AccountSetting extends React.Component<
       isRedeemCode: false,
       redeemCode: "",
       isSendingCode: false,
-
       countdown: 0,
+      serverRegion: ConfigService.getItem("serverRegion") || "global",
     };
   }
   componentDidMount(): void {
@@ -84,7 +87,7 @@ class AccountSetting extends React.Component<
       toast.error(this.props.t("At least one login option should be kept"));
       return;
     }
-    toast.loading(this.props.t("Removing..."), {
+    toast.loading(this.props.t("Removing"), {
       id: "remove-login-option",
     });
     let userRequest = await getUserRequest();
@@ -155,57 +158,13 @@ class AccountSetting extends React.Component<
       this.props.handleFetchUserInfo();
       this.setState({ settingLogin: "" });
     } else {
+      if (this.state.settingLogin === "email") {
+        toast(this.props.t("Please make sure the email and code are correct"));
+      }
       toast.error(this.props.t("Login failed, error code") + ": " + res.msg, {
         id: "bind-login-option",
       });
     }
-  };
-
-  renderSwitchOption = (optionList: any[]) => {
-    return optionList.map((item) => {
-      return (
-        <div
-          style={item.isElectron ? (isElectron ? {} : { display: "none" }) : {}}
-          key={item.propName}
-        >
-          <div className="setting-dialog-new-title" key={item.title}>
-            <span style={{ width: "calc(100% - 100px)" }}>
-              <Trans>{item.title}</Trans>
-            </span>
-
-            <span
-              className="single-control-switch"
-              onClick={() => {
-                switch (item.propName) {
-                  default:
-                    this.handleSetting(item.propName);
-                    break;
-                }
-              }}
-              style={this.state[item.propName] ? {} : { opacity: 0.6 }}
-            >
-              <span
-                className="single-control-button"
-                style={
-                  this.state[item.propName]
-                    ? {
-                        transform: "translateX(20px)",
-                        transition: "transform 0.5s ease",
-                      }
-                    : {
-                        transform: "translateX(0px)",
-                        transition: "transform 0.5s ease",
-                      }
-                }
-              ></span>
-            </span>
-          </div>
-          <p className="setting-option-subtitle">
-            <Trans>{item.desc}</Trans>
-          </p>
-        </div>
-      );
-    });
   };
   render() {
     return (
@@ -378,6 +337,14 @@ class AccountSetting extends React.Component<
                       toast.success(this.props.t("Send successfully"), {
                         id: "send-email-code",
                       });
+                      toast(
+                        this.props.t(
+                          "If you didn't receive the verification code, please check the spam folder or use another email provider"
+                        ),
+                        {
+                          duration: 6000,
+                        }
+                      );
                       this.setState({ isSendingCode: false });
                       let countdown = 60;
                       let timer = setInterval(() => {
@@ -521,21 +488,67 @@ class AccountSetting extends React.Component<
           </div>
         )}
         <div className="setting-dialog-new-title">
-          <Trans>Add login option</Trans>
+          <Trans>Select server region</Trans>
           <select
             name=""
             className="lang-setting-dropdown"
-            onChange={this.handleAddLoginOption}
+            onChange={(event) => {
+              if (!event.target.value) {
+                return;
+              }
+              if (event.target.value === "china") {
+                toast(
+                  this.props.t(
+                    "Some login options and data sources are not available in your selected server region"
+                  )
+                );
+              }
+              ConfigService.setItem("serverRegion", event.target.value);
+              this.setState({
+                serverRegion: event.target.value,
+              });
+              resetReaderRequest();
+              resetUserRequest();
+              resetThirdpartyRequest();
+              toast.success(this.props.t("Setup successful"));
+            }}
           >
-            {[{ label: "Please select", value: "" }, ...loginList]
-              .filter((item) => {
-                if (this.props.loginOptionList.length > 0) {
-                  return !this.props.loginOptionList.includes(item.value);
-                } else {
-                  return true;
+            {[
+              { value: "", label: "Please select" },
+              { value: "global", label: "Global" },
+              { value: "china", label: "China" },
+            ].map((item) => (
+              <option
+                value={item.value}
+                key={item.value}
+                className="lang-setting-option"
+                selected={
+                  item.value ===
+                  (ConfigService.getItem("serverRegion") || "global")
                 }
-              })
-              .map((item) => (
+              >
+                {this.props.t(item.label)}
+              </option>
+            ))}
+          </select>
+        </div>
+        {!this.props.isAuthed && (
+          <div className="setting-dialog-new-title">
+            <Trans>Select login method</Trans>
+            <select
+              name=""
+              className="lang-setting-dropdown"
+              onChange={this.handleAddLoginOption}
+            >
+              {[
+                { label: "Please select", value: "" },
+                ...loginList.filter((item) => {
+                  if (ConfigService.getItem("serverRegion") === "china") {
+                    return item.isCNAvailable;
+                  }
+                  return true;
+                }),
+              ].map((item) => (
                 <option
                   value={item.value}
                   key={item.value}
@@ -544,37 +557,92 @@ class AccountSetting extends React.Component<
                   {this.props.t(item.label)}
                 </option>
               ))}
-          </select>
-        </div>
-        <div className="setting-dialog-new-title">
-          <Trans>Delete login option</Trans>
-          <select
-            name=""
-            className="lang-setting-dropdown"
-            onChange={this.handleDeleteLoginOption}
-          >
-            {[{ label: "Please select", value: "" }, ...loginList]
-              .filter((item) => {
-                if (item.value === "") {
-                  return true;
-                }
-                if (this.props.loginOptionList.length > 0) {
-                  return this.props.loginOptionList.includes(item.value);
-                } else {
-                  return false;
-                }
-              })
-              .map((item) => (
-                <option
-                  value={item.value}
-                  key={item.value}
-                  className="lang-setting-option"
+            </select>
+          </div>
+        )}
+        {this.props.isAuthed &&
+          loginList
+            .filter((item) => {
+              if (this.state.serverRegion === "china") {
+                return item.isCNAvailable;
+              }
+              return true;
+            })
+            .map((login) => (
+              <div className="setting-dialog-new-title" key={login.value}>
+                <Trans>{this.props.t(login.label)}</Trans>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => {
+                    if (
+                      !this.props.loginOptionList.find(
+                        (item) => item.provider === login.value
+                      )
+                    ) {
+                      this.handleAddLoginOption({
+                        target: { value: login.value },
+                      });
+                    }
+                  }}
                 >
-                  {this.props.t(item.label)}
-                </option>
-              ))}
-          </select>
-        </div>
+                  <div>
+                    {this.props.loginOptionList.find(
+                      (item) => item.provider === login.value
+                    ) ? (
+                      this.props.loginOptionList.find(
+                        (item) => item.provider === login.value
+                      )?.email ? (
+                        <span>
+                          {
+                            this.props.loginOptionList.find(
+                              (item) => item.provider === login.value
+                            )?.email
+                          }
+                        </span>
+                      ) : (
+                        <span>{this.props.t("Bound")}</span>
+                      )
+                    ) : (
+                      <span style={{ opacity: 0.4 }}>
+                        {this.props.t("Not bound")}
+                      </span>
+                    )}
+                  </div>
+                  {this.props.loginOptionList.find(
+                    (item) => item.provider === login.value
+                  ) ? (
+                    <span
+                      className="icon-trash"
+                      style={{
+                        fontSize: 13,
+                        opacity: 0.8,
+                        marginLeft: "10px",
+                      }}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        this.handleDeleteLoginOption({
+                          target: { value: login.value },
+                        });
+                      }}
+                    ></span>
+                  ) : (
+                    <span
+                      className="icon-dropdown"
+                      style={{
+                        fontSize: 13,
+                        opacity: 0.8,
+                        transform: "rotate(-90deg)",
+                        marginLeft: "10px",
+                      }}
+                    ></span>
+                  )}
+                </div>
+              </div>
+            ))}
 
         {this.props.isAuthed && (
           <div className="setting-dialog-new-title">
@@ -643,15 +711,15 @@ class AccountSetting extends React.Component<
         {this.props.isAuthed && this.props.userInfo && (
           <div className="setting-dialog-new-title">
             <Trans>Account type</Trans>
-            <div>
-              <Trans>
-                {this.props.userInfo.type === "trial"
-                  ? "Trial user"
-                  : this.props.userInfo.type === "pro"
-                  ? "Pro user"
-                  : "Free user"}
-              </Trans>
-              <>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <span>
+                <Trans>
+                  {this.props.userInfo.type === "trial"
+                    ? "Trial user"
+                    : this.props.userInfo.type === "pro"
+                    ? "Pro user"
+                    : "Free user"}
+                </Trans>
                 {" ("}
                 <Trans
                   i18nKey="Valid until"
@@ -665,7 +733,22 @@ class AccountSetting extends React.Component<
                   }}
                 </Trans>
                 {")"}
-              </>
+              </span>
+              <span
+                className="change-location-button"
+                style={{ marginLeft: "10px", cursor: "pointer" }}
+                onClick={async () => {
+                  toast.loading(this.props.t("Refreshing"), {
+                    id: "refresh-user-info",
+                  });
+                  await this.props.handleFetchUserInfo();
+                  toast.success(this.props.t("Refresh successful"), {
+                    id: "refresh-user-info",
+                  });
+                }}
+              >
+                <Trans>Refresh</Trans>
+              </span>
             </div>
           </div>
         )}

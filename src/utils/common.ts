@@ -16,6 +16,26 @@ import toast from "react-hot-toast";
 import i18n from "../i18n";
 import { getThirdpartyRequest } from "./request/thirdparty";
 declare var window: any;
+export const supportedFormats = [
+  ".epub",
+  ".pdf",
+  ".txt",
+  ".mobi",
+  ".azw3",
+  ".azw",
+  ".htm",
+  ".html",
+  ".xml",
+  ".xhtml",
+  ".mhtml",
+  ".docx",
+  ".md",
+  ".fb2",
+  ".cbz",
+  ".cbt",
+  ".cbr",
+  ".cb7",
+];
 export const calculateFileMD5 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -176,11 +196,36 @@ export const getPageWidth = (
 
     return limit;
   };
+  if (
+    document.body.clientWidth * Math.abs(parseFloat(scale)) -
+      document.body.clientWidth * 0.4 >
+    document.body.clientWidth
+  ) {
+    if (
+      document.body.clientWidth * Math.abs(parseFloat(scale)) -
+        document.body.clientWidth * 0.4 >
+      document.body.clientWidth
+    ) {
+      let pageWidth = document.body.clientWidth - 106;
+      let pageOffset = 50 + "px";
+      return {
+        pageOffset,
+        pageWidth: pageWidth + "px",
+      };
+    }
+    let pageWidth = document.body.clientWidth - 106;
+    let pageOffset = 50 + "px";
+    return {
+      pageOffset,
+      pageWidth: pageWidth + "px",
+    };
+  }
+
   let pageOffset = "";
-  let pageWidth = "";
+  let pageWidth = 0;
   if (readerMode === "scroll" || readerMode === "single") {
     let preWidth =
-      document.body.clientWidth * parseFloat(scale) -
+      document.body.clientWidth * Math.abs(parseFloat(scale)) -
       document.body.clientWidth * 0.4 -
       (isNavLocked ? 300 : 0) -
       (isSettingLocked ? 300 : 0);
@@ -188,7 +233,7 @@ export const getPageWidth = (
     pageOffset = `calc(50vw + ${isNavLocked ? 150 : 0}px - ${
       isSettingLocked ? 150 : 0
     }px - ${width / 2}px)`;
-    pageWidth = `${width}px`;
+    pageWidth = width;
   } else if (readerMode === "double") {
     let width = findValidMultiple(
       document.body.clientWidth -
@@ -200,11 +245,16 @@ export const getPageWidth = (
     pageOffset = `calc(50vw + ${isNavLocked ? 150 : 0}px - ${
       isSettingLocked ? 150 : 0
     }px - ${width / 2}px)`;
-    pageWidth = `${width}px`;
+    pageWidth = width;
+  }
+  console.log(`Page Offset: ${pageOffset}, Page Width: ${pageWidth}`);
+  if (pageWidth > document.body.clientWidth) {
+    pageWidth = document.body.clientWidth - 106;
+    pageOffset = 50 + "px";
   }
   return {
     pageOffset,
-    pageWidth,
+    pageWidth: pageWidth + "px",
   };
 };
 export const loadFontData = async () => {
@@ -323,21 +373,25 @@ export const preCacheAllBooks = async (bookList: Book[]) => {
       true,
       selectedBook.path
     );
-    let rendition = BookHelper.getRendtion(
+    let rendition = BookHelper.getRendition(
       result,
-      selectedBook.format,
-      "",
-      selectedBook.charset,
-      ConfigService.getReaderConfig("isSliding") === "yes" ? "sliding" : "",
-      ConfigService.getReaderConfig("convertChinese"),
-      "",
-      "no",
-      "no",
+      {
+        format: selectedBook.format,
+        readerMode: "",
+        charset: selectedBook.charset,
+        animation:
+          ConfigService.getReaderConfig("isSliding") === "yes" ? "sliding" : "",
+        convertChinese: ConfigService.getReaderConfig("convertChinese"),
+        parserRegex: "",
+        isDarkMode: "no",
+        isMobile: "no",
+        password: getPdfPassword(selectedBook),
+      },
       Kookit
     );
     let cache = await rendition.preCache(result);
     if (cache !== "err" || cache) {
-      BookUtil.addBook("cache-" + selectedBook.key, "zip", cache);
+      await BookUtil.addBook("cache-" + selectedBook.key, "zip", cache);
     }
   }
 };
@@ -478,6 +532,7 @@ export const getDefaultTransTarget = (langList) => {
     zhTW: "Chinese",
     zhMO: "Chinese",
     ja: "Japanese",
+    uk: "Ukrainian",
     ko: "Korean",
     vi: "Vietnamese",
     th: "Thai",
@@ -535,6 +590,19 @@ export const checkMissingBook = (bookList: Book[]) => {
       fs.copyFileSync(book.path, expectedPath);
     }
   }
+};
+export const checkBrokenData = async () => {
+  let localSyncRecords = ConfigService.getAllSyncRecord();
+  let localBooks = Object.keys(localSyncRecords).filter(
+    (item) =>
+      item.startsWith("database.sqlite.books") &&
+      localSyncRecords[item].operation !== "delete"
+  );
+  let actualbooks = await DatabaseService.getAllRecords("books");
+  if (localBooks.length > 0 && actualbooks.length === 0) {
+    return true;
+  }
+  return false;
 };
 export const testConnection = async (driveName: string, driveConfig: any) => {
   toast.loading(i18n.t("Testing connection..."), {
@@ -617,4 +685,10 @@ export const getTargetHref = (event: any) => {
           event.target.parentNode.parentNode.getAttribute("src")))) ||
     "";
   return href;
+};
+export const getPdfPassword = (book: Book) => {
+  if (book.format !== "PDF" || !book?.description) return "";
+  // 匹配形如 protected PDF: #password# 的内容
+  const match = book.description.match(/protected PDF: #(.+?)#/);
+  return match ? match[1] : "";
 };
